@@ -42,6 +42,14 @@ flutter build windows --release
 # Output: build/windows/x64/runner/Release/ConvertPrinter.exe
 ```
 
+## Screenshots
+
+![Convert Printer screenshot 1](assets/images/1.png)
+
+![Convert Printer screenshot 2](assets/images/2.png)
+
+![Convert Printer screenshot 3](assets/images/3.jpg)
+
 ## License
 
 MIT

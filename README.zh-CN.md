@@ -42,6 +42,14 @@ flutter build windows --release
 # 输出：build/windows/x64/runner/Release/ConvertPrinter.exe
 ```
 
+## 应用截图
+
+![Convert Printer 应用截图 1](assets/images/1.png)
+
+![Convert Printer 应用截图 2](assets/images/2.png)
+
+![Convert Printer 应用截图 3](assets/images/3.jpg)
+
 ## 许可证
 
 MIT
