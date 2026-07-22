@@ -273,10 +273,22 @@ input[type=file]{font-size:12px}
 .notify-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
 .notify-dl{background:#1565c0;color:#fff}.notify-dl:active{background:#0d47a1}
 .notify-ignore{background:#f5f5f5;color:#666}.notify-ignore:active{background:#e0e0e0}
-</style></head><body>
+#scanProgress{display:none;margin-top:4px}
+#scanBar{width:100%;height:6px;border-radius:3px;appearance:none}
+#scanBar::-webkit-progress-bar{background:#e0e0e0;border-radius:3px}
+#scanBar::-webkit-progress-value{background:#1565c0;border-radius:3px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head><body>
 <div class="notification" id="notifications"></div>
 <div class="card">
 <h1>Convert Printers</h1>
+<div class="section">
+<div class="section-title">Scan Document (OCR)</div>
+<input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none">
+<button class="btn btn-primary" id="btnScan" style="width:100%">Scan Text from Image</button>
+<div id="scanProgress"><progress id="scanBar" value="0" max="100"></progress><span class="status" id="scanStatus"></span></div>
+</div>
 <div class="section">
 <div class="section-title">Send Text</div>
 <textarea id="textInput" placeholder="Type article..."></textarea>
@@ -367,6 +379,20 @@ c('btnSendText').addEventListener('click',sendText);
 c('btnUpload').addEventListener('click',uploadFiles);
 c('btnRefreshPreview').addEventListener('click',refreshPreview);
 c('btnDownloadPdf').addEventListener('click',function(){window.open('/pdf')});
+c('btnScan').addEventListener('click',function(){c('scanInput').click()});
+c('scanInput').addEventListener('change',function(){
+  var f=c('scanInput').files[0];if(!f)return;
+  c('scanProgress').style.display='block';c('scanStatus').textContent='Loading OCR...';
+  if(typeof Tesseract==='undefined'){c('scanStatus').textContent='Tesseract loading... retry in 3s';return}
+  Tesseract.recognize(f,'chi_sim+eng',{logger:function(m){
+    if(m.status==='recognizing text'){c('scanBar').value=m.progress*100;c('scanStatus').textContent=Math.round(m.progress*100)+'%'}
+  }}).then(function(r){
+    c('textInput').value=r.data.text;c('scanProgress').style.display='none';
+    c('scanStatus').textContent='Done! '+r.data.text.length+' chars. Sending to PC...';
+    fetch('/text',{method:'POST',body:JSON.stringify({text:r.data.text}),headers:{'Content-Type':'application/json'}})
+    .then(function(){c('scanStatus').textContent='Sent to PC!'}).catch(function(){c('scanStatus').textContent='Send failed'})
+  }).catch(function(e){c('scanStatus').textContent='Error: '+e.message})
+});
 c('fileInput').addEventListener('change',function(){var n=[];for(var i=0;i<this.files.length;i++)n.push(this.files[i].name);c('fileSelected').textContent=n.join(', ')});
 
 connectWs();refreshPreview()
