@@ -1,5 +1,7 @@
 # Convert Printer
 
+[中文 README](README.zh-CN.md)
+
 A Flutter-based Windows desktop application for text editing, real-time PDF generation, mobile OCR scanning, and two-way file transfer over a local network.
 
 ## Overview
