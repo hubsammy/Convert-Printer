@@ -1,5 +1,6 @@
 #include <flutter/dart_project.h>
 #include <flutter/flutter_view_controller.h>
+#include <flutter_windows.h>
 #include <windows.h>
 
 #include "flutter_window.h"
@@ -25,8 +26,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
-  Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
+  Win32Window::Point origin(8, 8);
+
+  // Fit the window to the current monitor instead of assuming a large screen.
+  // Create() multiplies these logical dimensions by the monitor scale factor.
+  HMONITOR monitor = MonitorFromPoint(POINT{8, 8}, MONITOR_DEFAULTTONEAREST);
+  double scale_factor = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+  int logical_width = static_cast<int>(
+      (GetSystemMetrics(SM_CXSCREEN) - 40) / scale_factor);
+  int logical_height = static_cast<int>(
+      (GetSystemMetrics(SM_CYSCREEN) - 80) / scale_factor);
+  if (logical_width < 760) logical_width = 760;
+  if (logical_height < 480) logical_height = 480;
+
+  Win32Window::Size size(logical_width, logical_height);
   if (!window.Create(L"Convert Printer", origin, size)) {
     return EXIT_FAILURE;
   }

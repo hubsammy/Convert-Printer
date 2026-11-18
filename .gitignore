@@ -56,3 +56,6 @@ windows/flutter/ephemeral/
 *.pdb
 *.ilk
 
+# Local version management utility
+/自制版本管理工具2.0/
+

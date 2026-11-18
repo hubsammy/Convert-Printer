@@ -19,6 +19,7 @@ class HttpTransferServer {
   final _channels = <WebSocketChannel>{};
 
   final _textReceivedController = StreamController<String>.broadcast();
+  void Function(String path, String name, int size)? onFileUploaded;
 
   Stream<String> get onTextReceived => _textReceivedController.stream;
   bool get isRunning => _running;
@@ -146,7 +147,9 @@ class HttpTransferServer {
           c++;
         }
         await File(path).writeAsBytes(bytes);
-        saved.add(safe);
+        final actualName = path.split(Platform.pathSeparator).last;
+        saved.add(actualName);
+        onFileUploaded?.call(path, actualName, bytes.length);
       }
       return shelf.Response.ok(jsonEncode({'ok': true, 'saved': saved}),
           headers: {'Content-Type': 'application/json'});
@@ -273,42 +276,31 @@ input[type=file]{font-size:12px}
 .notify-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
 .notify-dl{background:#1565c0;color:#fff}.notify-dl:active{background:#0d47a1}
 .notify-ignore{background:#f5f5f5;color:#666}.notify-ignore:active{background:#e0e0e0}
-#scanProgress{display:none;margin-top:4px}
-#scanBar{width:100%;height:6px;border-radius:3px;appearance:none}
-#scanBar::-webkit-progress-bar{background:#e0e0e0;border-radius:3px}
-#scanBar::-webkit-progress-value{background:#1565c0;border-radius:3px}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head><body>
 <div class="notification" id="notifications"></div>
 <div class="card">
-<h1>Convert Printers</h1>
+<h1>Convert Printer</h1>
 <div class="section">
-<div class="section-title">Scan Document (OCR)</div>
-<input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none">
-<button class="btn btn-primary" id="btnScan" style="width:100%">Scan Text from Image</button>
-<div id="scanProgress"><progress id="scanBar" value="0" max="100"></progress><span class="status" id="scanStatus"></span></div>
-</div>
-<div class="section">
-<div class="section-title">Send Text</div>
-<textarea id="textInput" placeholder="Type article..."></textarea>
+<textarea id="textInput" placeholder="Type article..." style="height:120px"></textarea>
 <button class="btn btn-primary" id="btnSendText" style="margin-top:6px;width:100%">Send to PC</button>
 <span class="status" id="status"></span>
 </div>
 <div class="section">
-<div class="section-title">Upload Files to PC</div>
-<input type="file" id="fileInput" multiple accept="image/*,audio/*,.txt,.md,.json,.csv,.xml,.html,.log,.pdf">
-<div id="fileSelected" style="font-size:11px;color:#666;margin:4px 0"></div>
-<button class="btn btn-primary" id="btnUpload" style="width:100%">Upload to PC</button>
+<div class="section-title">Upload & Transfer</div>
+<input type="file" id="fileInput" multiple accept="image/*,audio/*,.txt,.md,.json,.csv,.xml,.html,.log,.pdf" style="display:none">
+<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
+<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+<button class="btn btn-primary" id="btnUpload">Upload</button>
+<button class="btn btn-primary" id="btnDownloadPdf">Download PDF</button>
+</div>
+<div id="fileSelected" style="font-size:11px;color:#666;margin-top:6px;text-align:center"></div>
 <span class="status" id="uploadStatus"></span>
 </div>
 <div class="section">
 <div class="section-title">PC Editor Preview</div>
 <button class="btn btn-sm" id="btnRefreshPreview">Refresh</button>
 <div class="preview" id="preview" style="background:#fafafa;border:2px solid #e0e0e0;border-radius:8px;padding:10px;min-height:40px;max-height:160px;overflow-y:auto;font-size:12px;white-space:pre-wrap;color:#555">Tap Refresh...</div>
-</div>
-<div class="section">
-<button class="btn btn-primary" id="btnDownloadPdf" style="width:100%">Download PDF</button>
 </div>
 </div>
 <script>
@@ -376,24 +368,10 @@ function refreshPreview(){
 }
 
 c('btnSendText').addEventListener('click',sendText);
-c('btnUpload').addEventListener('click',uploadFiles);
 c('btnRefreshPreview').addEventListener('click',refreshPreview);
 c('btnDownloadPdf').addEventListener('click',function(){window.open('/pdf')});
-c('btnScan').addEventListener('click',function(){c('scanInput').click()});
-c('scanInput').addEventListener('change',function(){
-  var f=c('scanInput').files[0];if(!f)return;
-  c('scanProgress').style.display='block';c('scanStatus').textContent='Loading OCR...';
-  if(typeof Tesseract==='undefined'){c('scanStatus').textContent='Tesseract loading... retry in 3s';return}
-  Tesseract.recognize(f,'chi_sim+eng',{logger:function(m){
-    if(m.status==='recognizing text'){c('scanBar').value=m.progress*100;c('scanStatus').textContent=Math.round(m.progress*100)+'%'}
-  }}).then(function(r){
-    c('textInput').value=r.data.text;c('scanProgress').style.display='none';
-    c('scanStatus').textContent='Done! '+r.data.text.length+' chars. Sending to PC...';
-    fetch('/text',{method:'POST',body:JSON.stringify({text:r.data.text}),headers:{'Content-Type':'application/json'}})
-    .then(function(){c('scanStatus').textContent='Sent to PC!'}).catch(function(){c('scanStatus').textContent='Send failed'})
-  }).catch(function(e){c('scanStatus').textContent='Error: '+e.message})
-});
-c('fileInput').addEventListener('change',function(){var n=[];for(var i=0;i<this.files.length;i++)n.push(this.files[i].name);c('fileSelected').textContent=n.join(', ')});
+c('btnUpload').addEventListener('click',function(){c('fileInput').click()});
+c('fileInput').addEventListener('change',function(){var n=[];for(var i=0;i<this.files.length;i++)n.push(this.files[i].name);c('fileSelected').textContent=n.join(', ');uploadFiles()});
 
 connectWs();refreshPreview()
 </script></body></html>''';

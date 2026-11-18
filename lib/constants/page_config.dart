@@ -9,7 +9,7 @@ class PageConfig {
   static const double defaultPageWidth = a4Width;
   static const double defaultPageHeight = a4Height;
 
-  static const double defaultFontSize = 14.0;
+  static const double defaultFontSize = 16.0;
   static const double minFontSize = 8.0;
   static const double maxFontSize = 72.0;
 

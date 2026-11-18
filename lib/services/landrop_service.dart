@@ -51,10 +51,22 @@ class LandropService {
     await _server!.start();
 
     _httpServer = HttpTransferServer(downloadDir: _downloadDir);
+    _wireHttpUploads();
     _httpServer!.onTextReceived.listen((text) {
       _textReceivedController.add(text);
     });
     await _httpServer!.start();
+  }
+
+  void _wireHttpUploads() {
+    _httpServer?.onFileUploaded = (path, name, size) {
+      _newFileController.add(LandropFile(
+        path: path,
+        name: name,
+        size: size,
+        modified: DateTime.now(),
+      ));
+    };
   }
 
   void updateEditorText(String text) => _httpServer?.updateText(text);
@@ -76,6 +88,7 @@ class LandropService {
     await _server!.start();
 
     _httpServer = HttpTransferServer(downloadDir: _downloadDir);
+    _wireHttpUploads();
     _httpServer!.onTextReceived.listen((text) => _textReceivedController.add(text));
     await _httpServer!.start();
   }

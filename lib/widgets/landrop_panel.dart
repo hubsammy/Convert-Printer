@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,62 +6,105 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../providers/editor_provider.dart';
+import '../services/landrop_service.dart';
 
-class LandropPanel extends StatefulWidget {
+/// LAN transfer controls shown in the QR transfer dialog.
+class LanTransferPanel extends StatefulWidget {
   final EditorProvider provider;
+  final VoidCallback? onTransferComplete;
 
-  const LandropPanel({super.key, required this.provider});
+  const LanTransferPanel({
+    super.key,
+    required this.provider,
+    this.onTransferComplete,
+  });
 
-  static Future<void> show(BuildContext context, EditorProvider provider) {
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => LandropPanel(provider: provider),
-    );
+  @override
+  State<LanTransferPanel> createState() => _LanTransferPanelState();
+}
+
+class _LanTransferPanelState extends State<LanTransferPanel> {
+  StreamSubscription<String>? _textSubscription;
+  StreamSubscription<LandropFile>? _fileSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _textSubscription =
+        widget.provider.landropService.onTextReceived.listen((_) {
+      _completeTransfer();
+    });
+    _fileSubscription = widget.provider.landropService.onNewFile.listen((_) {
+      _completeTransfer();
+    });
+  }
+
+  void _completeTransfer() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onTransferComplete?.call();
+    });
   }
 
   @override
-  State<LandropPanel> createState() => _LandropPanelState();
-}
+  void dispose() {
+    _textSubscription?.cancel();
+    _fileSubscription?.cancel();
+    super.dispose();
+  }
 
-class _LandropPanelState extends State<LandropPanel> {
   @override
   Widget build(BuildContext context) {
     final svc = widget.provider.landropService;
-    return AlertDialog(
-      title: Row(
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD0D0D0)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.wifi, size: 20),
-          const SizedBox(width: 8),
-          const Text('LAN Transfer'),
-          const Spacer(),
-          Icon(Icons.fiber_manual_record, size: 10,
-              color: svc.isRunning ? Colors.green : Colors.red),
-          const SizedBox(width: 4),
-          Text(svc.isRunning ? 'Running' : 'Error',
-              style: TextStyle(fontSize: 12, color: svc.isRunning ? Colors.green : Colors.red)),
+          Row(
+            children: [
+              const Icon(Icons.wifi, size: 18, color: Color(0xFF1565C0)),
+              const SizedBox(width: 6),
+              const Text(
+                '局域网传输',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.fiber_manual_record,
+                size: 10,
+                color: svc.isRunning ? Colors.green : Colors.red,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                svc.isRunning ? '运行中' : '未运行',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: svc.isRunning ? Colors.green : Colors.red,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildServerInfo(),
+          const SizedBox(height: 12),
+          _buildActions(),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _changeDir,
+            icon: const Icon(Icons.folder_open, size: 16),
+            label: const Text('修改接收目录', style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(34),
+            ),
+          ),
         ],
       ),
-      content: SizedBox(
-        width: 460,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildServerInfo(),
-            const SizedBox(height: 12),
-            _buildActions(),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-        FilledButton.icon(
-          onPressed: () => _changeDir(),
-          icon: const Icon(Icons.folder_open, size: 18),
-          label: const Text('Change Dir'),
-        ),
-      ],
     );
   }
 
@@ -77,45 +121,72 @@ class _LandropPanelState extends State<LandropPanel> {
         children: [
           Row(
             children: [
-              Icon(svc.isRunning ? Icons.check_circle : Icons.error,
-                  size: 18, color: svc.isRunning ? Colors.green : Colors.red),
+              Icon(
+                svc.isRunning ? Icons.check_circle : Icons.error,
+                size: 16,
+                color: svc.isRunning ? Colors.green : Colors.red,
+              ),
               const SizedBox(width: 6),
-              Text(svc.isRunning ? 'Service RUNNING' : 'Service STOPPED',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13,
-                      color: svc.isRunning ? Colors.green : Colors.red)),
+              Text(
+                svc.isRunning ? '服务运行中' : '服务未运行',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: svc.isRunning ? Colors.green : Colors.red,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text('TCP: ${svc.tcpPort}  |  HTTP: ${svc.httpUrl}',
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+          const SizedBox(height: 4),
+          Text(
+            'TCP: ${svc.tcpPort}  |  HTTP: ${svc.httpUrl}',
+            style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+          ),
           if (svc.httpUrl.isNotEmpty) ...[
             const SizedBox(height: 8),
             Center(
-              child: QrImageView(
-                data: svc.httpUrl,
-                version: QrVersions.auto,
-                size: 100,
-                backgroundColor: Colors.white,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: QrImageView(
+                  data: svc.httpUrl,
+                  version: QrVersions.auto,
+                  size: 120,
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.white,
+                ),
               ),
             ),
             const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(
-                  child: Text(svc.httpUrl,
-                      style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                      textAlign: TextAlign.center),
+                  child: Text(
+                    svc.httpUrl,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.copy, size: 16),
-                  tooltip: 'Copy URL',
+                  tooltip: '复制地址',
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: svc.httpUrl));
-                    _snack('URL copied');
+                    _snack('地址已复制');
                   },
                 ),
               ],
+            ),
+            const Text(
+              '手机扫码打开传输页，可发送文字/文件到电脑',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10, color: Color(0xFF9E9E9E)),
             ),
           ],
         ],
@@ -127,34 +198,29 @@ class _LandropPanelState extends State<LandropPanel> {
     return Row(
       children: [
         Expanded(
-          child: SizedBox(height: 34,
+          child: SizedBox(
+            height: 34,
             child: OutlinedButton.icon(
               onPressed: _sendTextToPhone,
               icon: const Icon(Icons.text_snippet, size: 16),
-              label: const Text('Send Text', style: TextStyle(fontSize: 10)),
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
+              label: const Text('发文字', style: TextStyle(fontSize: 11)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+              ),
             ),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         Expanded(
-          child: SizedBox(height: 34,
-            child: OutlinedButton.icon(
-              onPressed: _sendPdfToPhone,
-              icon: const Icon(Icons.send, size: 16),
-              label: const Text('Send PDF', style: TextStyle(fontSize: 10)),
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
-            ),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: SizedBox(height: 34,
+          child: SizedBox(
+            height: 34,
             child: OutlinedButton.icon(
               onPressed: _sendFileToPhone,
               icon: const Icon(Icons.attach_file, size: 16),
-              label: const Text('Send File', style: TextStyle(fontSize: 10)),
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6)),
+              label: const Text('发文件', style: TextStyle(fontSize: 11)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+              ),
             ),
           ),
         ),
@@ -164,16 +230,12 @@ class _LandropPanelState extends State<LandropPanel> {
 
   Future<void> _sendTextToPhone() async {
     final text = widget.provider.text;
-    if (text.isEmpty) { _snack('Editor is empty'); return; }
+    if (text.isEmpty) {
+      _snack('编辑器内容为空');
+      return;
+    }
     await widget.provider.landropService.sendTextToPhone(text);
-    _snack('Text sent to phone');
-  }
-
-  Future<void> _sendPdfToPhone() async {
-    final pdf = widget.provider.pdfData;
-    if (pdf == null) { _snack('No PDF generated'); return; }
-    await widget.provider.landropService.sendPdfToPhone(pdf.toList());
-    _snack('PDF sent to phone');
+    _snack('文字已发送到手机');
   }
 
   Future<void> _sendFileToPhone() async {
@@ -186,27 +248,40 @@ class _LandropPanelState extends State<LandropPanel> {
       if (path.isEmpty) return;
       final name = path.split(Platform.pathSeparator).last;
       await widget.provider.landropService.sendFileToPhone(path);
-      _snack('$name sent to phone');
+      _snack('$name 已发送到手机');
     } catch (_) {}
   }
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg, style: const TextStyle(fontSize: 12)),
-          duration: const Duration(seconds: 2)),
+      SnackBar(
+        content: Text(msg, style: const TextStyle(fontSize: 12)),
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
   Future<void> _changeDir() async {
-    final ctrl = TextEditingController(text: widget.provider.landropService.downloadDir);
+    final ctrl = TextEditingController(
+      text: widget.provider.landropService.downloadDir,
+    );
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Download Directory'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Path')),
+        title: const Text('接收目录'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(hintText: '路径'),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('OK')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: const Text('确定'),
+          ),
         ],
       ),
     );
